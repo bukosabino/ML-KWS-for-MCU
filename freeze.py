@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 #
-# Modifications Copyright 2017 Arm Inc. All Rights Reserved.        
+# Modifications Copyright 2017 Arm Inc. All Rights Reserved.
 # Added model dimensions as command line argument for generating the pb file
 #
 #
@@ -55,6 +55,7 @@ import input_data
 import models
 from tensorflow.python.framework import graph_util
 
+FILTER = 'MSFB' # MSFB (Mel Spectrograms Filter Banks) or MFCC (Mel Frequency Cepstrum)
 FLAGS = None
 
 
@@ -94,10 +95,15 @@ def create_inference_graph(wanted_words, sample_rate, clip_duration_ms,
       window_size=model_settings['window_size_samples'],
       stride=model_settings['window_stride_samples'],
       magnitude_squared=True)
-  fingerprint_input = contrib_audio.mfcc(
-      spectrogram,
-      decoded_sample_data.sample_rate,
-      dct_coefficient_count=dct_coefficient_count)
+  if FILTER == 'MSFB':
+      fingerprint_input = input_data.log_mel_filterbank_spectrograms(spectrogram)
+  elif FILTER == 'MFCC':
+      fingerprint_input = contrib_audio.mfcc(
+          spectrogram,
+          decoded_sample_data.sample_rate,
+          dct_coefficient_count=dct_coefficient_count)
+  else:
+      raise ValueError('FILTER is unexpected value: %s. Possible values (MFCC or MSFB)' % FILTER)
   fingerprint_frequency_size = model_settings['dct_coefficient_count']
   fingerprint_time_size = model_settings['spectrogram_length']
   reshaped_input = tf.reshape(fingerprint_input, [

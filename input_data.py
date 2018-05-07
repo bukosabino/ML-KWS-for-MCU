@@ -44,6 +44,30 @@ UNKNOWN_WORD_LABEL = '_unknown_'
 UNKNOWN_WORD_INDEX = 1
 BACKGROUND_NOISE_DIR_NAME = '_background_noise_'
 RANDOM_SEED = 59185
+FILTER = 'MSFB' # MSFB (Mel Spectrograms Filter Banks) or MFCC (Mel Frequency Cepstrum)
+
+
+def log_mel_filterbank_spectrograms(magnitude_spectrograms):
+    """Get log-mel filterbank spectrogram using tf.contrib.signal module of
+    tensorflow. All operations have GPU support and are differentiable.
+    https://www.tensorflow.org/api_guides/python/contrib.signal
+    """
+    # Warp the linear-scale, magnitude spectrograms into the mel-scale.
+    num_spectrogram_bins = magnitude_spectrograms.shape[-1].value
+    lower_edge_hertz, upper_edge_hertz, num_mel_bins,  = 80.0, 7600.0, 64
+    sample_rate = 16000
+
+    linear_to_mel_weight_matrix = tf.contrib.signal.linear_to_mel_weight_matrix(
+        num_mel_bins, num_spectrogram_bins, sample_rate, lower_edge_hertz,
+        upper_edge_hertz)
+    mel_spectrograms = tf.tensordot(
+        magnitude_spectrograms, linear_to_mel_weight_matrix, 1)
+    # Note: Shape inference for `tf.tensordot` does not currently handle this case.
+    mel_spectrograms.set_shape(magnitude_spectrograms.shape[:-1].concatenate(
+        linear_to_mel_weight_matrix.shape[-1:]))
+
+    log_offset = 1e-6
+    return tf.log(mel_spectrograms + log_offset)
 
 
 def prepare_words_list(wanted_words):
@@ -342,6 +366,7 @@ class AudioProcessor(object):
       - background_data_placeholder_: PCM sample data for background noise.
       - background_volume_placeholder_: Loudness of mixed-in background.
       - mfcc_: Output 2D fingerprint of processed audio.
+      - msfb_: Output 2D fingerprint of processed audio (mel-scaled filter banks).
 
     Args:
       model_settings: Information about the current model being trained.
@@ -373,16 +398,21 @@ class AudioProcessor(object):
                                  self.background_volume_placeholder_)
     background_add = tf.add(background_mul, sliced_foreground)
     background_clamp = tf.clip_by_value(background_add, -1.0, 1.0)
-    # Run the spectrogram and MFCC ops to get a 2D 'fingerprint' of the audio.
+    # Run the spectrogram and filter ops to get a 2D 'fingerprint' of the audio.
     spectrogram = contrib_audio.audio_spectrogram(
         background_clamp,
         window_size=model_settings['window_size_samples'],
         stride=model_settings['window_stride_samples'],
         magnitude_squared=True)
-    self.mfcc_ = contrib_audio.mfcc(
-        spectrogram,
-        wav_decoder.sample_rate,
-        dct_coefficient_count=model_settings['dct_coefficient_count'])
+    if FILTER == 'MSFB':
+        self.msfb_ = log_mel_filterbank_spectrograms(spectrogram)
+    elif FILTER == 'MFCC':
+        self.mfcc_ = contrib_audio.mfcc(
+            spectrogram,
+            wav_decoder.sample_rate,
+            dct_coefficient_count=model_settings['dct_coefficient_count'])
+    else:
+        raise ValueError('FILTER is unexpected value: %s. Possible values (MFCC or MSFB)' % FILTER)
 
   def set_size(self, mode):
     """Calculates the number of samples in the dataset partition.
