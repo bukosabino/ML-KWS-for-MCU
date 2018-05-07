@@ -8,7 +8,8 @@ These were my improvements:
 Coefficients as input features to the neural networks. [Motivation] (http://haythamfayek.com/2016/04/21/speech-processing-for-machine-learning.html).
 
 * I used different techniques to do data augmentation such as, add different
-noises, stretch sounds, shift/roll sounds and set of amplitude.
+noises, stretch sounds, shift/roll sounds and set of amplitude. So, you need
+run 'prepare.py' script before train and test.
 
 # Keyword spotting for Microcontrollers
 
