@@ -4,7 +4,7 @@ I used this code to get 87.1 % success in [TensorFlow Speech Recognition Challen
 
 These were my improvements:
 
-* I used Log-Mel Spectrograms Filter Banks en lugar de Mel Frequency Cepstral
+* I used Log-Mel Spectrograms Filter Banks instead of Mel Frequency Cepstral
 Coefficients as input features to the neural networks. [Motivation] (http://haythamfayek.com/2016/04/21/speech-processing-for-machine-learning.html).
 
 * I used different techniques to do data augmentation such as, add different
